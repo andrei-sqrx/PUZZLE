@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS GT | Premium Automotive Experience</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Montserrat:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loader">
+        <div class="loader-content">
+            <div class="loader-logo">NEXUS</div>
+            <div class="loader-bar-track">
+                <div class="loader-bar-fill" id="loader-fill"></div>
+            </div>
+            <div class="loader-text" id="loader-text">Loading 3D Model...</div>
+        </div>
+    </div>
+
+    <!-- Scroll Progress Bar -->
+    <div id="scroll-progress"><div id="scroll-progress-fill"></div></div>
+
+    <!-- Navigation -->
+    <nav id="navbar">
+        <div class="nav-brand">NEXUS</div>
+        <div class="nav-links">
+            <a href="#" class="nav-link">Models</a>
+            <a href="#" class="nav-link">Design</a>
+            <a href="#" class="nav-link">Performance</a>
+            <a href="#" class="nav-link">Technology</a>
+        </div>
+        <a href="#cta-section" class="nav-cta">Configure Yours</a>
+    </nav>
+
+    <!-- Three.js Canvas -->
+    <canvas id="scene-canvas"></canvas>
+
+    <!-- Performance Fallback -->
+    <div id="fallback" style="display:none;">
+        <div class="fallback-content">
+            <h2>NEXUS GT</h2>
+            <p>For the full 3D experience, please use a device with WebGL support.</p>
+            <a href="#" class="btn-primary">View Gallery Instead</a>
+        </div>
+    </div>
+
+    <!-- Scroll Sections -->
+    <div id="scroll-container">
+
+        <!-- Section 0: Hero -->
+        <section class="scroll-section" id="hero-section">
+            <div class="section-content hero-content">
+                <p class="section-eyebrow">Introducing</p>
+                <h1 class="hero-title">The New<br><span class="accent">NEXUS GT</span></h1>
+                <p class="hero-subtitle">Where artistry meets aerodynamics. A grand tourer forged for those who demand the extraordinary.</p>
+                <div class="scroll-indicator">
+                    <span>Scroll to explore</span>
+                    <div class="scroll-arrow"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 1: Front Three-Quarter -->
+        <section class="scroll-section" id="front-section">
+            <div class="section-content side-left">
+                <p class="section-eyebrow">Design</p>
+                <h2 class="section-title">Designed to<br>Command</h2>
+                <p class="section-body">Every surface has been sculpted in the wind tunnel. The adaptive front splitter and active air curtains generate 40% more downforce than its predecessor, while the signature LED matrix headlights pierce through the darkness with surgical precision.</p>
+                <div class="section-stat-row">
+                    <div class="stat"><span class="stat-value">0.26</span><span class="stat-label">Cd Drag Coefficient</span></div>
+                    <div class="stat"><span class="stat-value">680</span><span class="stat-label">Horsepower</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Side Profile -->
+        <section class="scroll-section" id="side-section">
+            <div class="section-content side-right">
+                <p class="section-eyebrow">Engineering</p>
+                <h2 class="section-title">Pure Elegance<br>in Motion</h2>
+                <p class="section-body">The elongated silhouette draws the eye from the sculpted fenders to the fastback roofline. Beneath the carbon-fibre body, a lightweight aluminium spaceframe houses a twin-turbo V8 engine delivering effortless performance.</p>
+                <div class="section-stat-row">
+                    <div class="stat"><span class="stat-value">3.2s</span><span class="stat-label">0–100 km/h</span></div>
+                    <div class="stat"><span class="stat-value">330</span><span class="stat-label">km/h Top Speed</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Interior -->
+        <section class="scroll-section" id="interior-section">
+            <div class="section-content side-left">
+                <p class="section-eyebrow">Interior</p>
+                <h2 class="section-title">Crafted for<br>the Driver</h2>
+                <p class="section-body">Hand-stitched Nappa leather wraps the cockpit in luxury. The driver-focused layout places the 12.3” curved OLED display, head-up display, and haptic controls within effortless reach. Every journey becomes a first-class experience.</p>
+                <div class="section-stat-row">
+                    <div class="stat"><span class="stat-value">18</span><span class="stat-label">Speaker Surround</span></div>
+                    <div class="stat"><span class="stat-value">64</span><span class="stat-label">Colour Ambient Light</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Rear View -->
+        <section class="scroll-section" id="rear-section">
+            <div class="section-content side-right">
+                <p class="section-eyebrow">Presence</p>
+                <h2 class="section-title">Unmistakable<br>Presence</h2>
+                <p class="section-body">The full-width LED light bar and active rear diffuser make the NEXUS GT impossible to ignore. The quad exhaust system delivers a symphony of power, while the deployable rear spoiler activates above 120 km/h for maximum stability.</p>
+                <div class="section-stat-row">
+                    <div class="stat"><span class="stat-value">4</span><span class="stat-label">Drive Modes</span></div>
+                    <div class="stat"><span class="stat-value">AWD</span><span class="stat-label">Intelligent Drive</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Configurator / Free Rotation -->
+        <section class="scroll-section section-tall" id="config-section">
+            <div class="section-content center-content">
+                <p class="section-eyebrow">Personalise</p>
+                <h2 class="section-title">Make It Yours</h2>
+                <p class="section-body center-text">Choose your perfect finish. Drag to rotate the vehicle and explore every angle.</p>
+            </div>
+        </section>
+
+        <!-- Section 6: CTA -->
+        <section class="scroll-section" id="cta-section">
+            <div class="section-content center-content">
+                <p class="section-eyebrow">Next Step</p>
+                <h2 class="section-title cta-title">Experience the<br><span class="accent">NEXUS GT</span></h2>
+                <p class="section-body center-text">Begin your journey with the vehicle that redefines the grand touring class.</p>
+                <div class="cta-buttons">
+                    <a href="#" class="btn-primary">Configure Yours</a>
+                    <a href="#" class="btn-secondary">Book a Test Drive</a>
+                    <a href="#" class="btn-secondary">Enquire Now</a>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Color Configurator UI -->
+    <div id="color-picker">
+        <div class="picker-label">Accent Colour</div>
+        <div class="colour-options">
+            <button class="colour-swatch active" data-color="#eebb00" data-name="Modena Yellow" title="Modena Yellow">
+                <span class="swatch-inner" style="background:#eebb00"></span>
+            </button>
+            <button class="colour-swatch" data-color="#1a1a2e" data-name="Obsidian Black" title="Obsidian Black">
+                <span class="swatch-inner" style="background:#1a1a2e"></span>
+            </button>
+            <button class="colour-swatch" data-color="#e8e8e8" data-name="Glacier White" title="Glacier White">
+                <span class="swatch-inner" style="background:#e8e8e8"></span>
+            </button>
+            <button class="colour-swatch" data-color="#8b1a1a" data-name="Rosso Corsa" title="Rosso Corsa">
+                <span class="swatch-inner" style="background:#8b1a1a"></span>
+            </button>
+            <button class="colour-swatch" data-color="#1a3a5c" data-name="Atlantic Blue" title="Atlantic Blue">
+                <span class="swatch-inner" style="background:#1a3a5c"></span>
+            </button>
+            <button class="colour-swatch" data-color="#2d4a2d" data-name="British Racing Green" title="British Racing Green">
+                <span class="swatch-inner" style="background:#2d4a2d"></span>
+            </button>
+        </div>
+        <div class="colour-name" id="colour-name">Modena Yellow</div>
+    </div>
+
+    <!-- Headlight / Ambient Controls -->
+    <div id="light-controls">
+        <button id="headlight-toggle" class="control-btn" title="Toggle Headlights">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/>
+                <line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+        </button>
+        <button id="ambient-toggle" class="control-btn" title="Toggle Ambient Lighting">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Hotspot Markers (positioned via JS) -->
+    <div id="hotspot-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
