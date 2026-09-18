@@ -20,19 +20,13 @@ const CONFIG = {
         racingGreen:    new THREE.Color(0x2d4a2d),
     },
     cameraPositions: [
-        { pos: [8, 3.5, 10],   target: [0, 0.6, 0], fov: 42 },   // 0 Hero
-        { pos: [5.5, 1.8, 4],  target: [0, 0.6, 0], fov: 38 },   // 1 Front ¾
-        { pos: [0, 1.4, 6.5],  target: [0, 0.6, 0], fov: 36 },   // 2 Side
-        { pos: [1.2, 2.0, 1.8],target: [0.2, 0.8, -0.2], fov: 52},// 3 Interior
-        { pos: [-5, 2, 4.5],   target: [0, 0.6, 0], fov: 38 },   // 4 Rear
-        { pos: [4, 2.5, 6],    target: [0, 0.6, 0], fov: 40 },   // 5 Config
-        { pos: [6, 2, 8],      target: [0, 0.4, 0], fov: 42 },   // 6 CTA
-    ],
-    hotspots: [
-        { pos: [2.25, 0.65, 0.75], title: 'Adaptive LED Matrix Headlights', desc: 'Intelligent high-beam assist with 84 individually controlled LEDs per unit. The system reads the road ahead and shapes the beam to illuminate without dazzling oncoming traffic — delivering up to 650 metres of visibility in complete darkness.' },
-        { pos: [1.45, 0.40, 1.05],  title: '21″ Forged Carbon-Ceramic Brakes', desc: 'Lightweight forged alloy wheels paired with carbon-ceramic brake discs provide relentless stopping power, shedding 18 kg of unsprung mass compared to conventional steel brakes. Track-proven endurance with road-car refinement.' },
-        { pos: [0.0, 1.62, 0.0],   title: 'Carbon Fibre Panoramic Roof', desc: 'A single-piece carbon fibre panel replaces the traditional steel roof, lowering the centre of gravity by 12 mm while flooding the cabin with natural light through the electrochromic glass section.' },
-        { pos: [-2.35, 0.95, 0.0], title: 'Active Aerodynamic Rear Spoiler', desc: 'Deploys automatically above 120 km/h and adjusts angle through three positions — Comfort, Sport, and Track — to balance downforce and drag. Generates up to 80 kg of additional rear-axle load at top speed.' },
+        { pos: [8, 3.5, 10],            target: [0, 0.6, 0],         fov: 42 }, // 0 Hero
+        { pos: [5.5, 1.8, 4],           target: [0, 0.6, 0],         fov: 38 }, // 1 Front ¾
+        { pos: [0, 1.4, 6.5],           target: [0, 0.6, 0],         fov: 36 }, // 2 Side
+        { pos: [-0.35, 1.02, 0.20],     target: [0.42, 0.82, -0.20], fov: 62 }, // 3 Interior (placed inside cabin)
+        { pos: [-5, 2, 4.5],            target: [0, 0.6, 0],         fov: 38 }, // 4 Rear
+        { pos: [4, 2.5, 6],             target: [0, 0.6, 0],         fov: 40 }, // 5 Config
+        { pos: [6, 2, 8],               target: [0, 0.4, 0],         fov: 42 }, // 6 CTA
     ],
 };
 
@@ -447,6 +441,11 @@ function setupLighting() {
     const rim = new THREE.DirectionalLight(0xd4a040, 0.55);
     rim.position.set(-2, 2.5, -6);
     scene.add(rim);
+
+    // Warm cockpit illumination — lights up dashboard, steering wheel & leather inside
+    const interiorLight = new THREE.PointLight(0xffeedb, 1.2, 3.2);
+    interiorLight.position.set(0.05, 1.15, 0);
+    scene.add(interiorLight);
 
     // Headlights (initially off)
     headlightL = new THREE.SpotLight(0xfff8e8, 0, 25, Math.PI / 5, 0.6, 1.2);
@@ -1542,10 +1541,10 @@ function getCameraStateForSection(index) {
         pos.set(0, 1.4, 15.0 * distMultiplier);
         target.set(0, 0.45, 0);
     } else if (index === 3) {
-        // Interior: intimate cockpit framing with wider FOV
-        fov = 64;
-        const dir = basePos.clone().sub(baseTarget).normalize();
-        pos.copy(baseTarget).add(dir.multiplyScalar(2.4));
+        // Interior: camera placed inside the cabin looking at steering wheel & dashboard
+        fov = 70;
+        pos.set(-0.38, 1.02, 0.16);
+        target.set(0.40, 0.80, -0.18);
     } else if (index === 4) {
         // Rear 3/4
         fov = 44;
@@ -1807,74 +1806,6 @@ function activateSection(index) {
     } else {
         stopOrbitMode();
     }
-
-    // Update hotspot visibility
-    updateHotspotVisibility(index);
-}
-
-// ────────────────────────────────────────────────────────────
-//  8 · HOTSPOTS
-// ────────────────────────────────────────────────────────────
-let hotspotEls = [];
-
-function createHotspots() {
-    const container = document.getElementById('hotspot-container');
-    CONFIG.hotspots.forEach((hs, i) => {
-        const el = document.createElement('div');
-        el.className = 'hotspot-marker';
-        el.dataset.index = i;
-        
-        // Create inner card
-        const card = document.createElement('div');
-        card.className = 'hotspot-card';
-        card.innerHTML = `<h4>${hs.title}</h4><p>${hs.desc}</p>`;
-        el.appendChild(card);
-        
-        el.addEventListener('click', () => {
-            // Toggle this hotspot, close others
-            const isOpen = el.classList.contains('open');
-            hotspotEls.forEach(h => h.classList.remove('open'));
-            if (!isOpen) el.classList.add('open');
-        });
-        
-        container.appendChild(el);
-        hotspotEls.push(el);
-    });
-}
-
-function updateHotspotVisibility(sectionIdx) {
-    // Show hotspots only in sections 1–4
-    const show = sectionIdx >= 1 && sectionIdx <= 4;
-    hotspotEls.forEach(el => {
-        if (show) el.classList.add('visible');
-        else { 
-            el.classList.remove('visible'); 
-            el.classList.remove('open'); 
-        }
-    });
-}
-
-function projectHotspots() {
-    if (!camera || !renderer) return;
-    const w = renderer.domElement.clientWidth;
-    const h = renderer.domElement.clientHeight;
-
-    hotspotEls.forEach((el, i) => {
-        const hs = CONFIG.hotspots[i];
-        tmpVec.set(...hs.pos);
-        if (carGroup) tmpVec.applyMatrix4(carGroup.matrixWorld);
-        tmpVec.project(camera);
-        const x = (tmpVec.x *  0.5 + 0.5) * w;
-        const y = (tmpVec.y * -0.5 + 0.5) * h;
-        // Hide if behind camera
-        if (tmpVec.z > 1) {
-            el.style.display = 'none';
-        } else {
-            el.style.display = 'block';
-            el.style.left = x + 'px';
-            el.style.top  = y + 'px';
-        }
-    });
 }
 
 // ────────────────────────────────────────────────────────────
@@ -2069,9 +2000,6 @@ function animate() {
         }
     }
 
-    // ── Project hotspots ──
-    projectHotspots();
-
     // ── Subtle car idle motion ──
     if (carGroup) {
         carGroup.rotation.y = Math.sin(t * 0.15) * 0.01;
@@ -2152,7 +2080,6 @@ async function init() {
 
     // Load the 3D model (Ferrari Purosangue) with real loading progress
     await loadCarModel();
-    createHotspots();
 
     // Dismiss loader screen and activate hero section
     const loader = document.getElementById('loader');

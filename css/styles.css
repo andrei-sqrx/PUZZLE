@@ -104,51 +104,6 @@ body{font-family:'Inter',system-ui,sans-serif;background:#050505;color:#e0e0e0;o
 .control-btn:hover{border-color:#c9a96e;color:#c9a96e}
 .control-btn.active{background:rgba(201,169,110,.2);border-color:#c9a96e;color:#c9a96e}
 
-/* ---------- Hotspot Markers ---------- */
-#hotspot-container{position:fixed;inset:0;z-index:50;pointer-events:none}
-.hotspot-marker{position:absolute;width:28px;height:28px;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;opacity:0;transition:opacity .5s ease}
-.hotspot-marker.visible{opacity:1}
-.hotspot-marker::before{content:'';position:absolute;inset:0;border:1.5px solid rgba(201,169,110,.7);border-radius:50%;animation:hotspot-ping 2s ease-out infinite}
-.hotspot-marker::after{content:'+';position:absolute;inset:4px;background:rgba(201,169,110,.85);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#050505;line-height:1}
-@keyframes hotspot-ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
-
-/* ---------- Hotspot Cards ---------- */
-.hotspot-card {
-    position: absolute;
-    top: 50%;
-    left: 40px;
-    transform: translateY(-50%) translateX(-10px);
-    width: 320px;
-    padding: 1.5rem;
-    background: rgba(10,10,10,.95);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,.08);
-    border-radius: 6px;
-    opacity: 0;
-    pointer-events: none;
-    transition: all .4s cubic-bezier(0.2, 0, 0, 1);
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-}
-.hotspot-marker.open .hotspot-card {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-    pointer-events: auto;
-}
-.hotspot-card h4 {
-    font-family: 'Montserrat', sans-serif;
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: #fff;
-    margin-bottom: .6rem;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-}
-.hotspot-card p {
-    font-size: .8rem;
-    line-height: 1.6;
-    color: rgba(255,255,255,.6);
-}
-
 /* ---------- Rotation Hint ---------- */
 .rotation-hint{display:inline-flex;align-items:center;gap:.6rem;margin-top:.85rem;padding:.45rem 1.1rem;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.28);border-radius:30px;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:#e8d5a3;pointer-events:none;backdrop-filter:blur(6px)}
 .rotation-hint svg{stroke:#c9a96e;animation:hint-glide 2.4s ease-in-out infinite}
