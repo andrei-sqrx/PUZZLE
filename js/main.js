@@ -37,6 +37,43 @@ const CONFIG = {
     ],
 };
 
+// ────────────────────────────────────────────────────────────
+//  Environment art direction
+//  Keep the scene tunable from one place so the background stays
+//  restrained while the car remains the visual focal point.
+// ────────────────────────────────────────────────────────────
+const ENVIRONMENT = {
+    sky: {
+        top: 0x040716,
+        mid: 0x101f3e,
+        horizon: 0x9b4c2d,
+        bottom: 0x080b12,
+    },
+    fog: {
+        density: 0.011,
+        color: 0x07101c,
+        glow: 0x25170d,
+        opacity: 0.24,
+    },
+    stars: {
+        count: 260,
+        lowPerfCount: 90,
+        minSize: 0.55,
+        maxSize: 1.65,
+    },
+    particles: {
+        count: 320,
+        lowPerfCount: 90,
+        opacity: 0.11,
+    },
+    floor: {
+        size: 64,
+        color: 0x101316,
+        roughness: 0.42,
+        metalness: 0.38,
+    },
+};
+
 let renderer, scene, camera, controls;
 let carGroup, paintMeshes = [], paintMaterials = [], glassMeshes = [];
 let headlightL, headlightR, tailLightEmissive = [], lightMaterials = [];
@@ -94,7 +131,7 @@ function initRenderer() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x050810, 0.012);
+    scene.fog = new THREE.FogExp2(ENVIRONMENT.fog.color, ENVIRONMENT.fog.density);
 
     camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
     const cp = CONFIG.cameraPositions[0];
@@ -120,10 +157,10 @@ function createEnvMap() {
     const envSkyMat = new THREE.ShaderMaterial({
         side: THREE.BackSide,
         uniforms: {
-            topColor:     { value: new THREE.Color(0x050814) },
-            midColor:     { value: new THREE.Color(0x0f1a3a) },
-            horizonColor: { value: new THREE.Color(0xc06030) },
-            bottomColor:  { value: new THREE.Color(0x1a0e08) },
+            topColor:     { value: new THREE.Color(ENVIRONMENT.sky.top) },
+            midColor:     { value: new THREE.Color(ENVIRONMENT.sky.mid) },
+            horizonColor: { value: new THREE.Color(ENVIRONMENT.sky.horizon) },
+            bottomColor:  { value: new THREE.Color(ENVIRONMENT.sky.bottom) },
         },
         vertexShader: `
             varying vec3 vWorldPos;
@@ -153,16 +190,25 @@ function createEnvMap() {
     envScene.add(new THREE.Mesh(envSkyGeo, envSkyMat));
 
     // Warm horizon glow panels (baked into env reflections for the car)
-    const panelGeo = new THREE.PlaneGeometry(20, 4);
-    const warmPanelMat = new THREE.MeshBasicMaterial({ color: 0xd08040, side: THREE.DoubleSide });
+    const panelGeo = new THREE.PlaneGeometry(24, 3.2);
+    const warmPanelMat = new THREE.MeshBasicMaterial({ color: 0xb86636, side: THREE.DoubleSide });
     const warmPanel = new THREE.Mesh(panelGeo, warmPanelMat);
-    warmPanel.position.set(0, 2, -45);
-    warmPanel.lookAt(0, 2, 0);
+    warmPanel.position.set(-3, 2.2, -34);
+    warmPanel.lookAt(0, 1.2, 0);
     envScene.add(warmPanel);
+
+    // A second, narrower warm card creates a controlled reflection band
+    // across the shoulder line instead of illuminating the whole body evenly.
+    const reflectionBandGeo = new THREE.PlaneGeometry(18, 1.4);
+    const reflectionBandMat = new THREE.MeshBasicMaterial({ color: 0x7e3822, side: THREE.DoubleSide });
+    const reflectionBand = new THREE.Mesh(reflectionBandGeo, reflectionBandMat);
+    reflectionBand.position.set(4, 3.8, -28);
+    reflectionBand.lookAt(0, 1.0, 0);
+    envScene.add(reflectionBand);
 
     // Subtle overhead cool fill panel
     const topPanelGeo = new THREE.PlaneGeometry(14, 8);
-    const topPanelMat = new THREE.MeshBasicMaterial({ color: 0x334466, side: THREE.DoubleSide });
+    const topPanelMat = new THREE.MeshBasicMaterial({ color: 0x2b3c5b, side: THREE.DoubleSide });
     const topPanel = new THREE.Mesh(topPanelGeo, topPanelMat);
     topPanel.position.set(0, 12, 0);
     topPanel.rotation.x = Math.PI / 2;
@@ -170,7 +216,7 @@ function createEnvMap() {
 
     // Side fill panels (subtle cool)
     const sidePanelGeo = new THREE.PlaneGeometry(8, 5);
-    const sidePanelMat = new THREE.MeshBasicMaterial({ color: 0x1a2a44, side: THREE.DoubleSide });
+    const sidePanelMat = new THREE.MeshBasicMaterial({ color: 0x14243c, side: THREE.DoubleSide });
     const sideL = new THREE.Mesh(sidePanelGeo, sidePanelMat.clone());
     sideL.position.set(-12, 3, 0);
     sideL.rotation.y = Math.PI / 2;
@@ -191,10 +237,11 @@ function createEnvMap() {
         side: THREE.BackSide,
         uniforms: {
             uTime:        { value: 0.0 },
-            topColor:     { value: new THREE.Color(0x050814) },
-            midColor:     { value: new THREE.Color(0x0f1a3a) },
-            horizonColor: { value: new THREE.Color(0xc06030) },
-            bottomColor:  { value: new THREE.Color(0x1a0e08) },
+            uNightMix:    { value: 0.0 },
+            topColor:     { value: new THREE.Color(ENVIRONMENT.sky.top) },
+            midColor:     { value: new THREE.Color(ENVIRONMENT.sky.mid) },
+            horizonColor: { value: new THREE.Color(ENVIRONMENT.sky.horizon) },
+            bottomColor:  { value: new THREE.Color(ENVIRONMENT.sky.bottom) },
         },
         vertexShader: `
             varying vec3 vWorldPos;
@@ -208,7 +255,7 @@ function createEnvMap() {
         `,
         fragmentShader: `
             uniform vec3 topColor, midColor, horizonColor, bottomColor;
-            uniform float uTime;
+            uniform float uTime, uNightMix;
             varying vec3 vWorldPos;
             varying vec2 vUv;
 
@@ -248,15 +295,19 @@ function createEnvMap() {
                 col = mix(col, midColor, smoothstep(0.0, 0.35, h));
                 col = mix(col, topColor, smoothstep(0.3, 0.7, h));
 
-                // High-altitude wispy cloud bands drifting across the sky
+                // High-altitude wispy cloud bands drifting across the sky.
+                // Keep the contrast low so the sky reads as atmosphere, not texture.
                 if(h > 0.05 && h < 0.45){
                     float angle = atan(vWorldPos.z, vWorldPos.x);
                     vec2 cloudUV = vec2(angle * 2.0 + uTime * 0.012, h * 8.0);
                     float cloud = fbm(cloudUV * 3.0);
-                    cloud = smoothstep(0.42, 0.68, cloud);
+                    cloud = smoothstep(0.47, 0.72, cloud);
                     float cloudFade = smoothstep(0.05, 0.15, h) * smoothstep(0.45, 0.25, h);
-                    col = mix(col, midColor * 1.6, cloud * cloudFade * 0.2);
+                    col = mix(col, midColor * 1.35, cloud * cloudFade * 0.12);
                 }
+
+                // Ambient mode cools the sky slightly for a night-drive mood.
+                col = mix(col, col * vec3(0.58, 0.72, 1.08), uNightMix * 0.45);
 
                 gl_FragColor = vec4(col, 1.0);
             }
@@ -272,7 +323,7 @@ function createEnvMap() {
 
 // Stars as a separate Points system above the sky dome
 function createStarField() {
-    const starCount = isLowPerf ? 400 : 1200;
+    const starCount = isLowPerf ? ENVIRONMENT.stars.lowPerfCount : ENVIRONMENT.stars.count;
     const positions = new Float32Array(starCount * 3);
     const sizes = new Float32Array(starCount);
     const twinklePhases = new Float32Array(starCount);
@@ -281,13 +332,14 @@ function createStarField() {
     for (let i = 0; i < starCount; i++) {
         // Distribute stars only in the upper hemisphere
         const theta = Math.random() * Math.PI * 2;
-        const phi = Math.random() * 0.65; // up to ~37° from zenith
+        const phi = Math.pow(Math.random(), 0.82) * 0.82; // keep the horizon mostly clear
         const r = 115;
         positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
         positions[i * 3 + 1] = r * Math.cos(phi); // y = up
         positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
 
-        sizes[i] = 0.8 + Math.random() * 2.0;
+        sizes[i] = ENVIRONMENT.stars.minSize +
+            Math.random() * (ENVIRONMENT.stars.maxSize - ENVIRONMENT.stars.minSize);
         twinklePhases[i] = Math.random() * Math.PI * 2;
         twinkleSpeeds[i] = 0.5 + Math.random() * 2.5;
     }
@@ -299,6 +351,7 @@ function createStarField() {
     const starMat = new THREE.ShaderMaterial({
         uniforms: {
             uTime: { value: 0.0 },
+            uNightMix: { value: 0.0 },
             uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
         },
         vertexShader: `
@@ -308,18 +361,19 @@ function createStarField() {
             varying float vTwinkle;
             void main(){
                 vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-                // Twinkle: each star uses its y-position as a phase offset
-                vTwinkle = 0.4 + 0.6 * abs(sin(uTime * (0.5 + position.x * 0.01) + position.z * 3.0));
+                // Slow, irregular twinkle; the field should feel nearly still.
+                vTwinkle = 0.62 + 0.38 * abs(sin(uTime * 0.22 + position.z * 0.14));
                 gl_PointSize = aSize * uPixelRatio * (80.0 / -mvPos.z);
                 gl_Position = projectionMatrix * mvPos;
             }
         `,
         fragmentShader: `
+            uniform float uNightMix;
             varying float vTwinkle;
             void main(){
                 float d = length(gl_PointCoord - 0.5);
-                float alpha = smoothstep(0.5, 0.15, d) * vTwinkle;
-                gl_FragColor = vec4(0.9, 0.92, 1.0, alpha);
+                float alpha = smoothstep(0.5, 0.15, d) * vTwinkle * mix(0.58, 0.92, uNightMix);
+                gl_FragColor = vec4(0.78, 0.84, 1.0, alpha);
             }
         `,
         transparent: true,
@@ -336,15 +390,15 @@ function createStarField() {
 // ────────────────────────────────────────────────────────────
 function setupLighting() {
     // Deep twilight blue ambient — fills the shadow side with cool mountain air tones
-    const amb = new THREE.AmbientLight(0x1a2540, 0.5);
+    const amb = new THREE.AmbientLight(0x172440, 0.36);
     scene.add(amb);
 
     // Hemisphere light: warm below (ground bounce from sunset), cool above (twilight sky)
-    const hemi = new THREE.HemisphereLight(0x0a1530, 0x3a2010, 0.4);
+    const hemi = new THREE.HemisphereLight(0x0a1530, 0x342013, 0.32);
     scene.add(hemi);
 
     // Low-angle warm sunset key light — casts dramatic long vehicle shadows
-    const key = new THREE.DirectionalLight(0xffa050, 1.6);
+    const key = new THREE.DirectionalLight(0xff9a52, 1.2);
     key.position.set(-6, 3, -8);  // low-angle from behind-left (sunset direction)
     key.castShadow = !isLowPerf;
     key.shadow.mapSize.set(1024, 1024);
@@ -359,35 +413,37 @@ function setupLighting() {
 
     // Overhead softbox — dimmed for twilight, subtle cool tone
     RectAreaLightUniformsLib.init();
-    const rect1 = new THREE.RectAreaLight(0xc0d0e8, 2.5, 10, 3);
+    const rect1 = new THREE.RectAreaLight(0xc0d0e8, 3.0, 14, 4);
     rect1.position.set(0, 4.5, 0);
     rect1.lookAt(0, 0, 0);
     scene.add(rect1);
 
     // Rear overhead softbox — subtle warm fill for the rear haunches
-    const rect2 = new THREE.RectAreaLight(0xe8c090, 1.5, 6, 2);
+    const rect2 = new THREE.RectAreaLight(0xe8c090, 1.0, 8, 2.5);
     rect2.position.set(-4, 3, 0);
     rect2.lookAt(0, 0, 0);
     scene.add(rect2);
 
     // Cool fill from the front-right (mountain blue ambient bounce)
-    const fill = new THREE.DirectionalLight(0x6080b0, 0.35);
+    const fill = new THREE.DirectionalLight(0x6080b0, 0.22);
     fill.position.set(4, 3, 3);
     scene.add(fill);
 
     // Golden rim light — grazes the roofline, wheel arches, and rear haunches from behind
-    const rim = new THREE.DirectionalLight(0xd4a040, 0.7);
+    const rim = new THREE.DirectionalLight(0xd4a040, 0.55);
     rim.position.set(-2, 2.5, -6);
     scene.add(rim);
 
     // Headlights (initially off)
     headlightL = new THREE.SpotLight(0xfff8e8, 0, 25, Math.PI / 5, 0.6, 1.2);
+    headlightL.userData.excludeAmbientControl = true;
     headlightL.position.set(2.45, 0.65, 0.75);
     headlightL.target.position.set(9.0, -0.2, 0.75);
     scene.add(headlightL);
     scene.add(headlightL.target);
 
     headlightR = new THREE.SpotLight(0xfff8e8, 0, 25, Math.PI / 5, 0.6, 1.2);
+    headlightR.userData.excludeAmbientControl = true;
     headlightR.position.set(2.45, 0.65, -0.75);
     headlightR.target.position.set(9.0, -0.2, -0.75);
     scene.add(headlightR);
@@ -395,35 +451,29 @@ function setupLighting() {
 }
 
 function createFloor() {
-    // ── Wet Asphalt Overlook Platform ──
-    const geo = new THREE.CylinderGeometry(6.5, 7.0, 0.12, 64);
+    // ── Broad wet asphalt terrace ──
+    // The larger plane lets the environment dissolve into fog instead of
+    // revealing a hard circular display platform around the vehicle.
+    const geo = new THREE.PlaneGeometry(ENVIRONMENT.floor.size, ENVIRONMENT.floor.size, 2, 2);
+    const asphaltTexture = createAsphaltRoughnessTexture();
     const mat = new THREE.MeshStandardMaterial({
-        color: 0x0a0a0a,
-        metalness: 0.6,
-        roughness: 0.22,   // wet asphalt — moderately reflective
-        envMapIntensity: 1.4,
+        color: ENVIRONMENT.floor.color,
+        metalness: ENVIRONMENT.floor.metalness,
+        roughness: ENVIRONMENT.floor.roughness,
+        roughnessMap: asphaltTexture,
+        bumpMap: asphaltTexture,
+        bumpScale: 0.018,
+        envMapIntensity: 0.95,
     });
     const floor = new THREE.Mesh(geo, mat);
+    floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.06;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Outer asphalt rim (wider, rougher edge for lookout shoulder)
-    const rimGeo = new THREE.RingGeometry(6.5, 9.0, 64, 1);
-    const rimMat = new THREE.MeshStandardMaterial({
-        color: 0x080808,
-        metalness: 0.3,
-        roughness: 0.55,
-        envMapIntensity: 0.6,
-    });
-    const rimFloor = new THREE.Mesh(rimGeo, rimMat);
-    rimFloor.rotation.x = -Math.PI / 2;
-    rimFloor.position.y = -0.06;
-    rimFloor.receiveShadow = true;
-    scene.add(rimFloor);
-
-    // ── Curved Steel Cable Guardrail ──
-    createGuardrail();
+    // A soft, elliptical wet patch gives the car a controlled reflection
+    // without turning the entire terrace into a mirror.
+    createReflectionPool();
 
     // ── Alpine Mountain Silhouettes ──
     createAlpineMountains();
@@ -433,6 +483,81 @@ function createFloor() {
 
     // ── Atmospheric Moisture Motes ──
     createAtmosphericParticles();
+}
+
+function createAsphaltRoughnessTexture() {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const image = ctx.createImageData(size, size);
+
+    // Fine grain keeps the asphalt from looking like a flat black plane.
+    for (let i = 0; i < image.data.length; i += 4) {
+        const value = 112 + Math.floor(Math.random() * 108);
+        image.data[i] = value;
+        image.data[i + 1] = value;
+        image.data[i + 2] = value;
+        image.data[i + 3] = 255;
+    }
+    ctx.putImageData(image, 0, 0);
+
+    // Larger darker patches represent irregular damp areas and break up the
+    // repeated grain at a distance.
+    ctx.globalCompositeOperation = 'multiply';
+    for (let i = 0; i < 24; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const radius = 12 + Math.random() * 34;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, 'rgba(45, 55, 68, 0.65)');
+        gradient.addColorStop(1, 'rgba(160, 170, 180, 0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, radius * 1.5, radius * 0.65, Math.random(), 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(3.5, 3.5);
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function createReflectionPool() {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createRadialGradient(size / 2, size / 2, 20, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    gradient.addColorStop(0.45, 'rgba(170, 195, 225, 0.62)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+
+    const alphaMap = new THREE.CanvasTexture(canvas);
+    const pool = new THREE.Mesh(
+        new THREE.PlaneGeometry(7.2, 3.4),
+        new THREE.MeshStandardMaterial({
+            color: 0x384b67,
+            metalness: 0.92,
+            roughness: 0.08,
+            envMapIntensity: 1.25,
+            alphaMap,
+            transparent: true,
+            opacity: 0.28,
+            depthWrite: false,
+        })
+    );
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.set(0, 0.004, 0.15);
+    pool.renderOrder = 1;
+    scene.add(pool);
 }
 
 // ── Guardrail along the cliff edge ──
@@ -505,7 +630,7 @@ function createAlpineMountains() {
         return points;
     }
 
-    function buildMountainMesh(ridgePath, baseY, color, rimColor, rimPower) {
+    function buildMountainMesh(ridgePath, baseY, color, rimColor, rimPower, opacity) {
         const verts = [];
         const indices = [];
 
@@ -536,6 +661,7 @@ function createAlpineMountains() {
                 uBaseColor: { value: new THREE.Color(color) },
                 uRimColor:  { value: new THREE.Color(rimColor) },
                 uRimPower:  { value: rimPower },
+                uOpacity:   { value: opacity },
                 uSunDir:    { value: new THREE.Vector3(-0.5, 0.15, -0.7).normalize() },
             },
             vertexShader: `
@@ -552,7 +678,7 @@ function createAlpineMountains() {
             `,
             fragmentShader: `
                 uniform vec3 uBaseColor, uRimColor, uSunDir;
-                uniform float uRimPower;
+                uniform float uRimPower, uOpacity;
                 varying vec3 vNormal, vWorldPos;
                 varying float vHeight;
                 void main(){
@@ -569,30 +695,35 @@ function createAlpineMountains() {
                     float heightFade = smoothstep(-1.0, 12.0, vHeight);
                     col = mix(uBaseColor * 0.6, col, heightFade);
 
-                    gl_FragColor = vec4(col, 1.0);
+                    gl_FragColor = vec4(col, uOpacity * mix(0.72, 1.0, heightFade));
                 }
             `,
             side: THREE.DoubleSide,
+            transparent: true,
+            depthWrite: false,
         });
 
         return new THREE.Mesh(geo, mat);
     }
 
     // Far range (deep, hazy, blueish silhouettes)
-    const farRidge = generateRidgePath(80, 90, 2, 28, 8, 42.0);
-    const farMtn = buildMountainMesh(farRidge, -3, 0x0a0e1a, 0x804020, 2.5);
+    const farRidge = generateRidgePath(80, 96, 2, 20, 7, 42.0);
+    const farMtn = buildMountainMesh(farRidge, -3, 0x0d1524, 0x394568, 2.5, 0.54);
+    farMtn.renderOrder = 0;
     scene.add(farMtn);
     mountainGroups.push({ mesh: farMtn, depth: 0.95, baseRotY: 0 });
 
     // Mid range (sharper, darker peaks)
-    const midRidge = generateRidgePath(60, 55, 1, 18, 5, 17.5);
-    const midMtn = buildMountainMesh(midRidge, -2, 0x06080e, 0xa05825, 3.0);
+    const midRidge = generateRidgePath(60, 58, 1, 12, 4.5, 17.5);
+    const midMtn = buildMountainMesh(midRidge, -2, 0x080d17, 0x61402c, 3.0, 0.72);
+    midMtn.renderOrder = 1;
     scene.add(midMtn);
     mountainGroups.push({ mesh: midMtn, depth: 0.65, baseRotY: 0 });
 
     // Near range (close crags, very dark)
-    const nearRidge = generateRidgePath(40, 28, -1, 8, 3, 7.2);
-    const nearMtn = buildMountainMesh(nearRidge, -2, 0x040608, 0x604020, 4.0);
+    const nearRidge = generateRidgePath(40, 31, -1, 5.5, 2.5, 7.2);
+    const nearMtn = buildMountainMesh(nearRidge, -2, 0x04060a, 0x392915, 4.0, 0.90);
+    nearMtn.renderOrder = 2;
     scene.add(nearMtn);
     mountainGroups.push({ mesh: nearMtn, depth: 0.3, baseRotY: 0 });
 }
@@ -603,8 +734,10 @@ function createDynamicFog() {
     fogPlaneMat = new THREE.ShaderMaterial({
         uniforms: {
             uTime: { value: 0.0 },
-            uFogColor:  { value: new THREE.Color(0x0a101c) },
-            uGlowColor: { value: new THREE.Color(0x2a1808) },
+            uNightMix: { value: 0.0 },
+            uOpacity: { value: ENVIRONMENT.fog.opacity },
+            uFogColor:  { value: new THREE.Color(ENVIRONMENT.fog.color) },
+            uGlowColor: { value: new THREE.Color(ENVIRONMENT.fog.glow) },
         },
         vertexShader: `
             varying vec2 vUv;
@@ -614,7 +747,7 @@ function createDynamicFog() {
             }
         `,
         fragmentShader: `
-            uniform float uTime;
+            uniform float uTime, uNightMix, uOpacity;
             uniform vec3 uFogColor, uGlowColor;
             varying vec2 vUv;
 
@@ -658,11 +791,13 @@ function createDynamicFog() {
                 float radialFade = smoothstep(0.1, 0.7, dist);
                 fog *= radialFade;
 
-                // Color: mix between cool fog and warm sunset glow near one edge
+                // Color: mix between cool fog and a restrained sunset glow near
+                // the horizon, while keeping the immediate foreground clear.
                 float warmth = smoothstep(0.3, 0.9, uv.y);
                 vec3 col = mix(uFogColor, uGlowColor, warmth * 0.4);
+                col = mix(col, col * vec3(0.58, 0.72, 1.08), uNightMix * 0.35);
 
-                gl_FragColor = vec4(col, fog * 0.45);
+                gl_FragColor = vec4(col, fog * uOpacity);
             }
         `,
         transparent: true,
@@ -671,22 +806,26 @@ function createDynamicFog() {
     });
     fogPlane = new THREE.Mesh(fogGeo, fogPlaneMat);
     fogPlane.rotation.x = -Math.PI / 2;
-    fogPlane.position.y = -0.5;  // below the platform, filling the valley
+    fogPlane.position.y = -0.42;  // below the terrace, filling the valley
+    fogPlane.renderOrder = 3;
     scene.add(fogPlane);
 }
 
 // ── Atmospheric Moisture Motes ──
 function createAtmosphericParticles() {
-    const count = isLowPerf ? 150 : 500;
+    const count = isLowPerf ? ENVIRONMENT.particles.lowPerfCount : ENVIRONMENT.particles.count;
     const positions = new Float32Array(count * 3);
     const velocities = [];
     const sizes = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-        // Distribute in a volume around the car
-        positions[i * 3]     = (Math.random() - 0.5) * 20;
-        positions[i * 3 + 1] = Math.random() * 4 + 0.2;
-        positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+        // Keep most motes at the edge of the scene so the air feels alive
+        // without putting a layer of noise directly over the bodywork.
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 5.5 + Math.random() * 6.5;
+        positions[i * 3]     = Math.cos(angle) * distance;
+        positions[i * 3 + 1] = Math.random() * 3.5 + 0.45;
+        positions[i * 3 + 2] = Math.sin(angle) * distance;
 
         // Gentle wind drift (mostly lateral with slight upward thermal)
         velocities.push(
@@ -709,13 +848,14 @@ function createAtmosphericParticles() {
         uniforms: {
             uTime: { value: 0.0 },
             uHeadlightsOn: { value: 0.0 },
+            uBaseOpacity: { value: ENVIRONMENT.particles.opacity },
             uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
         },
         vertexShader: `
             attribute float aSize;
             uniform float uTime;
             uniform float uPixelRatio;
-            uniform float uHeadlightsOn;
+            uniform float uHeadlightsOn, uBaseOpacity;
             varying float vAlpha;
             varying float vLit;
             void main(){
@@ -723,7 +863,7 @@ function createAtmosphericParticles() {
 
                 // Flicker: subtle per-mote oscillation
                 float flicker = 0.5 + 0.5 * sin(uTime * 1.5 + position.x * 10.0 + position.z * 7.0);
-                vAlpha = 0.15 + 0.15 * flicker;
+                vAlpha = uBaseOpacity + uBaseOpacity * flicker;
 
                 // Headlight illumination: motes in front of car glow brighter
                 float inBeam = step(0.0, position.x) * smoothstep(5.0, 0.0, abs(position.z)) * smoothstep(6.0, 0.0, position.x);
@@ -775,7 +915,7 @@ function createContactShadow() {
     const planeMat = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.93,
         depthWrite: false,
     });
     const shadowMesh = new THREE.Mesh(planeGeo, planeMat);
@@ -1578,15 +1718,34 @@ function setupLightControls() {
     amBtn.addEventListener('click', () => {
         ambientMode = !ambientMode;
         amBtn.classList.toggle('active', ambientMode);
-        renderer.toneMappingExposure = ambientMode ? 0.5 : 1.1;
+        gsap.to(renderer, {
+            toneMappingExposure: ambientMode ? 0.72 : 1.1,
+            duration: 0.9,
+            ease: 'power2.inOut',
+        });
 
-        // Dim showroom lights for "night" feel
+        // Dim all environment lights together for a coherent night-drive
+        // mood, while leaving the independent headlight toggle untouched.
         scene.traverse(child => {
-            if (child.isDirectionalLight) {
-                gsap.to(child, { intensity: ambientMode ? child.intensity * 0.3 : child.userData.origIntensity || child.intensity, duration: 0.8 });
-                if (!child.userData.origIntensity) child.userData.origIntensity = child.intensity;
+            if (child.isLight && child.intensity !== undefined && !child.userData.excludeAmbientControl) {
+                if (child.userData.baseIntensity === undefined) {
+                    child.userData.baseIntensity = child.intensity;
+                }
+                const targetIntensity = child.userData.baseIntensity * (ambientMode ? 0.46 : 1.0);
+                gsap.to(child, { intensity: targetIntensity, duration: 0.9, ease: 'power2.inOut' });
             }
         });
+
+        const nightMix = ambientMode ? 1 : 0;
+        if (skyDomeMat?.uniforms.uNightMix) {
+            gsap.to(skyDomeMat.uniforms.uNightMix, { value: nightMix, duration: 0.9 });
+        }
+        if (starField?.material.uniforms.uNightMix) {
+            gsap.to(starField.material.uniforms.uNightMix, { value: nightMix, duration: 0.9 });
+        }
+        if (fogPlaneMat?.uniforms.uNightMix) {
+            gsap.to(fogPlaneMat.uniforms.uNightMix, { value: nightMix, duration: 0.9 });
+        }
     });
 }
 
@@ -1702,7 +1861,7 @@ function animate() {
         const positions = atmosphericParticlePositions;
         const velocities = atmosphericParticleVelocities;
         const count = positions.length / 3;
-        const bounds = 10;
+        const bounds = 12;
 
         for (let i = 0; i < count; i++) {
             positions[i * 3]     += velocities[i * 3]     * dt;
