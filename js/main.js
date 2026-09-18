@@ -4,7 +4,6 @@
 // ============================================================
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
@@ -74,7 +73,7 @@ const ENVIRONMENT = {
     },
 };
 
-let renderer, scene, camera, controls;
+let renderer, scene, camera;
 let carGroup, paintMeshes = [], paintMaterials = [], glassMeshes = [];
 let headlightL, headlightR, tailLightEmissive = [], lightMaterials = [];
 let frontLightMaterials = [], rearLightMaterials = [];
@@ -82,8 +81,18 @@ let headlightsOn = false, ambientMode = false;
 let envMap;
 let currentSection = 0, scrollProgress = 0;
 let mouseX = 0, mouseY = 0;
-let orbiting = false;
 let isLowPerf = false;
+
+// Configurator 360 Orbit State
+let isOrbitMode = false;
+const orbitTarget = new THREE.Vector3(0, 0.6, 0);
+let orbitAzimuth = 0;
+let targetAzimuth = 0;
+let orbitPolar = Math.PI * 0.38;
+let targetPolar = Math.PI * 0.38;
+let orbitDistance = 7.5;
+const minPolar = Math.PI * 0.22;
+const maxPolar = Math.PI * 0.52;
 
 // Alpine background dynamic elements
 let skyDomeMat = null;
@@ -114,7 +123,7 @@ function initRenderer() {
     try {
         renderer = new THREE.WebGLRenderer({
             canvas,
-            antialias: !isLowPerf,
+            antialias: true,
             powerPreference: 'high-performance',
             alpha: false,
         });
@@ -123,7 +132,7 @@ function initRenderer() {
         return false;
     }
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isLowPerf ? 1 : 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
     renderer.shadowMap.enabled = !isLowPerf;
@@ -134,11 +143,16 @@ function initRenderer() {
     scene.fog = new THREE.FogExp2(ENVIRONMENT.fog.color, ENVIRONMENT.fog.density);
 
     camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
-    const cp = CONFIG.cameraPositions[0];
-    camera.position.set(...cp.pos);
-    lerpCamPos.set(...cp.pos);
-    lerpCamTgt.set(...cp.target);
-    camera.lookAt(new THREE.Vector3(...cp.target));
+    const state0 = getCameraStateForSection(0);
+    if (state0) {
+        camera.position.copy(state0.pos);
+        camera.fov = state0.fov;
+        camera.updateProjectionMatrix();
+        lerpCamPos.copy(state0.pos);
+        lerpCamTgt.copy(state0.target);
+        lerpFov = state0.fov;
+        camera.lookAt(state0.target);
+    }
 
     return true;
 }
@@ -1480,18 +1494,245 @@ function createWheel(tireMat, chromeMat, darkMat) {
 }
 
 // ────────────────────────────────────────────────────────────
-//  6 · ORBIT CONTROLS (for configurator section)
+//  6 · RESPONSIVE CAMERA & CONFIGURATOR 360 INTERACTION
 // ────────────────────────────────────────────────────────────
-function setupOrbitControls() {
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.enableZoom = false;
-    controls.enablePan = false;
-    controls.minPolarAngle = Math.PI * 0.2;
-    controls.maxPolarAngle = Math.PI * 0.55;
-    controls.target.set(0, 0.6, 0);
-    controls.enabled = false;
+function getCameraStateForSection(index) {
+    const cp = CONFIG.cameraPositions[index];
+    if (!cp) return null;
+
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const aspect = w / h;
+    const isPortrait = aspect < 1.0;
+
+    const basePos = new THREE.Vector3(...cp.pos);
+    const baseTarget = new THREE.Vector3(...cp.target);
+    let fov = cp.fov;
+
+    if (!isPortrait) {
+        // Desktop landscape: use calibrated defaults
+        return { pos: basePos, target: baseTarget, fov };
+    }
+
+    // Portrait / Mobile framing:
+    // When viewport is portrait, aspect ratio is narrow (~0.42 to 0.56).
+    // In Three.js, PerspectiveCamera FOV is vertical, so narrow aspect drastically shrinks
+    // the horizontal field of view. We scale camera distance so the 5m Ferrari fits completely
+    // across all section angles with clean breathing margins.
+    const pos = basePos.clone();
+    const target = baseTarget.clone();
+    const aspectFactor = Math.max(0.38, Math.min(0.7, aspect));
+    const distMultiplier = 0.50 / aspectFactor;
+
+    if (index === 0) {
+        // Hero: dynamic 3/4 angle, fully framed
+        fov = 46;
+        const dir = basePos.clone().sub(baseTarget).normalize();
+        pos.copy(baseTarget).add(dir.multiplyScalar(15.5 * distMultiplier));
+        target.set(0, 0.45, 0);
+    } else if (index === 1) {
+        // Front 3/4
+        fov = 44;
+        const dir = basePos.clone().sub(baseTarget).normalize();
+        pos.copy(baseTarget).add(dir.multiplyScalar(13.8 * distMultiplier));
+        target.set(0.3, 0.45, 0);
+    } else if (index === 2) {
+        // Side profile: full 5m car length must fit horizontally
+        fov = 44;
+        pos.set(0, 1.4, 15.0 * distMultiplier);
+        target.set(0, 0.45, 0);
+    } else if (index === 3) {
+        // Interior: intimate cockpit framing with wider FOV
+        fov = 64;
+        const dir = basePos.clone().sub(baseTarget).normalize();
+        pos.copy(baseTarget).add(dir.multiplyScalar(2.4));
+    } else if (index === 4) {
+        // Rear 3/4
+        fov = 44;
+        const dir = basePos.clone().sub(baseTarget).normalize();
+        pos.copy(baseTarget).add(dir.multiplyScalar(13.8 * distMultiplier));
+        target.set(-0.2, 0.45, 0);
+    } else if (index === 5) {
+        // Configurator section initial position
+        fov = 44;
+        const dir = basePos.clone().sub(baseTarget).normalize();
+        pos.copy(baseTarget).add(dir.multiplyScalar(14.0 * distMultiplier));
+        target.set(0, 0.45, 0);
+    } else if (index === 6) {
+        // CTA section
+        fov = 46;
+        const dir = basePos.clone().sub(baseTarget).normalize();
+        pos.copy(baseTarget).add(dir.multiplyScalar(15.0 * distMultiplier));
+        target.set(0, 0.45, 0);
+    }
+
+    return { pos, target, fov };
+}
+
+function getOrbitDistanceForCurrentViewport() {
+    const aspect = window.innerWidth / window.innerHeight;
+    if (aspect < 1.0) {
+        const aspectFactor = Math.max(0.38, Math.min(0.7, aspect));
+        return 14.0 * (0.50 / aspectFactor);
+    }
+    return 7.5;
+}
+
+function getOrbitTargetForCurrentViewport() {
+    const aspect = window.innerWidth / window.innerHeight;
+    if (aspect < 1.0) {
+        return new THREE.Vector3(0, 0.45, 0);
+    }
+    return new THREE.Vector3(0, 0.6, 0);
+}
+
+function startOrbitMode() {
+    isOrbitMode = true;
+
+    orbitTarget.copy(getOrbitTargetForCurrentViewport());
+    orbitDistance = getOrbitDistanceForCurrentViewport();
+
+    // Preserve camera's current elevation and azimuth for seamless transition
+    const offset = camera.position.clone().sub(orbitTarget);
+    const radius = offset.length() || orbitDistance;
+
+    orbitPolar = Math.acos(Math.max(-1, Math.min(1, offset.y / radius)));
+    orbitPolar = Math.max(minPolar, Math.min(maxPolar, orbitPolar));
+    targetPolar = orbitPolar;
+
+    orbitAzimuth = Math.atan2(offset.x, offset.z);
+    targetAzimuth = orbitAzimuth;
+}
+
+function stopOrbitMode() {
+    isOrbitMode = false;
+}
+
+function updateOrbitCamera(dt) {
+    if (!isOrbitMode) return;
+
+    const damping = Math.min(1.0, 10.0 * dt);
+    orbitAzimuth += (targetAzimuth - orbitAzimuth) * damping;
+    orbitPolar += (targetPolar - orbitPolar) * damping;
+    orbitPolar = Math.max(minPolar, Math.min(maxPolar, orbitPolar));
+
+    const sinPhi = Math.sin(orbitPolar);
+    const cosPhi = Math.cos(orbitPolar);
+    const sinTheta = Math.sin(orbitAzimuth);
+    const cosTheta = Math.cos(orbitAzimuth);
+
+    camera.position.x = orbitTarget.x + orbitDistance * sinPhi * sinTheta;
+    camera.position.y = orbitTarget.y + orbitDistance * cosPhi;
+    camera.position.z = orbitTarget.z + orbitDistance * sinPhi * cosTheta;
+
+    camera.lookAt(orbitTarget);
+}
+
+function setupInteraction() {
+    // Desktop Mouse Drag
+    let isMouseDown = false;
+    let mouseLastX = 0;
+    let mouseLastY = 0;
+
+    window.addEventListener('mousedown', (e) => {
+        if (!isOrbitMode || e.button !== 0) return;
+        if (e.target.closest('#color-picker') || e.target.closest('#light-controls') || 
+            e.target.closest('#navbar') || e.target.closest('button') || e.target.closest('a')) {
+            return;
+        }
+        isMouseDown = true;
+        mouseLastX = e.clientX;
+        mouseLastY = e.clientY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isOrbitMode || !isMouseDown) return;
+        const deltaX = e.clientX - mouseLastX;
+        const deltaY = e.clientY - mouseLastY;
+
+        const sensitivity = (Math.PI * 2) / Math.max(window.innerWidth, 600);
+        targetAzimuth -= deltaX * sensitivity * 1.0;
+        targetPolar -= deltaY * sensitivity * 0.45;
+        targetPolar = Math.max(minPolar, Math.min(maxPolar, targetPolar));
+
+        mouseLastX = e.clientX;
+        mouseLastY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', () => {
+        isMouseDown = false;
+    });
+
+    // Mobile Touch: Intelligent gesture distinction between Vertical Scroll and Horizontal 360 Rotation
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchLastX = 0;
+    let touchLastY = 0;
+    let gestureIntent = 'undecided'; // 'undecided' | 'scroll' | 'rotate'
+    const GESTURE_THRESHOLD = 8; // px
+
+    window.addEventListener('touchstart', (e) => {
+        if (!isOrbitMode || e.touches.length !== 1) return;
+        if (e.target.closest('#color-picker') || e.target.closest('#light-controls') || 
+            e.target.closest('#navbar') || e.target.closest('button') || e.target.closest('a')) {
+            return;
+        }
+
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchLastX = touchStartX;
+        touchLastY = touchStartY;
+        gestureIntent = 'undecided';
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+        if (!isOrbitMode || e.touches.length !== 1) return;
+        if (gestureIntent === 'scroll') return; // Let native browser vertical scroll happen freely!
+
+        const curX = e.touches[0].clientX;
+        const curY = e.touches[0].clientY;
+        const dx = curX - touchStartX;
+        const dy = curY - touchStartY;
+
+        if (gestureIntent === 'undecided') {
+            const absX = Math.abs(dx);
+            const absY = Math.abs(dy);
+            if (absX > GESTURE_THRESHOLD || absY > GESTURE_THRESHOLD) {
+                if (absX >= absY) {
+                    // Horizontal movement: user wants to rotate the car 360 degrees
+                    gestureIntent = 'rotate';
+                } else {
+                    // Vertical movement: user wants to scroll the page
+                    gestureIntent = 'scroll';
+                    return;
+                }
+            }
+        }
+
+        if (gestureIntent === 'rotate') {
+            // Cancel vertical page jitter while rotating
+            if (e.cancelable) e.preventDefault();
+
+            const deltaX = curX - touchLastX;
+            const deltaY = curY - touchLastY;
+
+            const sensitivity = (Math.PI * 2) / Math.max(window.innerWidth, 360);
+            targetAzimuth -= deltaX * sensitivity * 1.35;
+            targetPolar -= deltaY * sensitivity * 0.4;
+            targetPolar = Math.max(minPolar, Math.min(maxPolar, targetPolar));
+        }
+
+        touchLastX = curX;
+        touchLastY = curY;
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+        gestureIntent = 'undecided';
+    }, { passive: true });
+
+    window.addEventListener('touchcancel', () => {
+        gestureIntent = 'undecided';
+    }, { passive: true });
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1560,13 +1801,11 @@ function activateSection(index) {
         lightCtl.classList.remove('visible');
     }
 
-    // Orbit controls only active in config section
+    // Configurator 360 orbit mode
     if (index === 5) {
-        controls.enabled = true;
-        orbiting = true;
+        startOrbitMode();
     } else {
-        controls.enabled = false;
-        orbiting = false;
+        stopOrbitMode();
     }
 
     // Update hotspot visibility
@@ -1770,6 +2009,12 @@ function setupResize() {
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+        if (isOrbitMode) {
+            orbitDistance = getOrbitDistanceForCurrentViewport();
+            orbitTarget.copy(getOrbitTargetForCurrentViewport());
+        }
     };
     window.addEventListener('resize', onResize);
 }
@@ -1788,8 +2033,6 @@ function detectPerformance() {
             if (gpuStr.includes('mali') || gpuStr.includes('adreno 5')) isLowPerf = true;
         }
     }
-    // Mobile heuristic
-    if (window.innerWidth < 768) isLowPerf = true;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1801,32 +2044,29 @@ function animate() {
     const dt = clock.getDelta();
     const t = clock.getElapsedTime();
 
-    // ── Camera interpolation (skip if orbiting) ──
-    if (!orbiting && CONFIG.cameraPositions[currentSection]) {
-        const cp = CONFIG.cameraPositions[currentSection];
-        const targetPos = new THREE.Vector3(...cp.pos);
-        const targetTgt = new THREE.Vector3(...cp.target);
+    // ── Camera positioning & orbit ──
+    if (isOrbitMode) {
+        updateOrbitCamera(dt);
+    } else {
+        const state = getCameraStateForSection(currentSection);
+        if (state) {
+            lerpCamPos.lerp(state.pos, 3.5 * dt);
+            lerpCamTgt.lerp(state.target, 3.5 * dt);
+            lerpFov += (state.fov - lerpFov) * 3.0 * dt;
 
-        lerpCamPos.lerp(targetPos, 3.5 * dt);
-        lerpCamTgt.lerp(targetTgt, 3.5 * dt);
-        lerpFov += (cp.fov - lerpFov) * 3.0 * dt;
+            // Apply mouse parallax (desktop only)
+            const px = mouseX * 0.25;
+            const py = mouseY * 0.15;
 
-        // Apply mouse parallax
-        const px = mouseX * 0.25;
-        const py = mouseY * 0.15;
-
-        camera.position.set(
-            lerpCamPos.x + px,
-            lerpCamPos.y - py,
-            lerpCamPos.z
-        );
-        camera.fov = lerpFov;
-        camera.updateProjectionMatrix();
-        camera.lookAt(lerpCamTgt);
-    }
-
-    if (orbiting && controls.enabled) {
-        controls.update();
+            camera.position.set(
+                lerpCamPos.x + px,
+                lerpCamPos.y - py,
+                lerpCamPos.z
+            );
+            camera.fov = lerpFov;
+            camera.updateProjectionMatrix();
+            camera.lookAt(lerpCamTgt);
+        }
     }
 
     // ── Project hotspots ──
@@ -1903,7 +2143,7 @@ async function init() {
     createEnvMap();
     setupLighting();
     createFloor();
-    setupOrbitControls();
+    setupInteraction();
     setupScroll();
     setupColourPicker();
     setupLightControls();
